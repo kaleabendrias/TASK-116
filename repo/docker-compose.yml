@@ -1,0 +1,39 @@
+services:
+  web:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    environment:
+      APP_MODE: production
+      TEST_MODE: "false"
+      LOCALE_DEFAULT: en-US
+      LOCALE_FALLBACK: en
+      STATIC_CONFIG_PATH: /app/config
+      VITE_APP_MODE: production
+      VITE_TEST_MODE: "false"
+      VITE_LOCALE_DEFAULT: en-US
+      VITE_LOCALE_FALLBACK: en
+      VITE_STATIC_CONFIG_PATH: /config
+      HOST: 0.0.0.0
+      PORT: "8080"
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      NPM_CONFIG_FUND: "false"
+      CI: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/app
+      - ./config:/app/config:ro
+      - app_node_modules:/app/node_modules
+    command: >
+      sh -lc "
+      set -eu;
+      echo '[boot] installing dependencies';
+      npm ci --no-audit --no-fund || npm install --no-audit --no-fund;
+      echo '[boot] building production bundle';
+      npm run build;
+      echo '[boot] serving on 0.0.0.0:8080';
+      npm run preview -- --host 0.0.0.0 --port 8080 --strictPort
+      "
+
+volumes:
+  app_node_modules:

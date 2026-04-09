@@ -1,0 +1,45 @@
+{
+  "language": "en",
+  "quietHours": { "startHour": 21, "endHour": 7 },
+  "messaging": {
+    "ratePerMinute": 30,
+    "maxAttempts": 3,
+    "retryBackoffMs": 60000
+  },
+  "grading": {
+    "partialIncrement": 0.5,
+    "secondReviewDelta": 10,
+    "weights": {
+      "single_choice": 1.0,
+      "multi_choice": 1.2,
+      "numeric": 1.0,
+      "short_answer": 1.5,
+      "true_false": 0.8,
+      "fill_in_blank": 1.1
+    }
+  },
+  "questions": {
+    "minDifficulty": 1,
+    "maxDifficulty": 5,
+    "minScore": 0,
+    "maxScore": 100
+  },
+  "departments": ["Genomics", "Proteomics", "Hematology", "Oncology", "General"],
+  "knowledgePoints": ["safety", "protocol", "instrumentation", "ethics", "data-integrity"],
+  "messageTemplates": [
+    { "id": "tpl-welcome", "name": "Welcome", "category": "system", "subject": "Welcome, {name}", "body": "Hi {name}, your account is ready. Role: {role}." },
+    { "id": "tpl-grade-ready", "name": "Grade Ready", "category": "grading", "subject": "Grade ready: {questionTitle}", "body": "Your attempt scored {score}/{max}." }
+  ],
+  "messageCategories": ["system", "grading", "wellness", "broadcast"],
+  "foods": [
+    { "id": "f-oat", "name": "Oatmeal", "category": "grain", "calories": 150, "tags": ["whole-grain","high-fiber"], "allergens": [] },
+    { "id": "f-yogurt", "name": "Greek Yogurt", "category": "dairy", "calories": 120, "tags": ["high-protein"], "allergens": ["dairy"] },
+    { "id": "f-soy", "name": "Soy Yogurt", "category": "dairy-alt", "calories": 110, "tags": ["high-protein","dairy-free"], "allergens": ["soy"] },
+    { "id": "f-quinoa", "name": "Quinoa Bowl", "category": "grain", "calories": 220, "tags": ["whole-grain","high-protein"], "allergens": [] },
+    { "id": "f-bagel", "name": "White Bagel", "category": "grain", "calories": 280, "tags": ["refined-grain"], "allergens": ["gluten"] }
+  ],
+  "foodEquivalents": {
+    "f-bagel": "f-oat",
+    "f-yogurt": "f-soy"
+  }
+}

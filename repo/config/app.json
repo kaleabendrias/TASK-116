@@ -1,0 +1,11 @@
+{
+  "appName": "Task 09 SPA",
+  "features": {
+    "trips": true,
+    "configurationConsole": true,
+    "questionManagement": true,
+    "messagingCenter": true,
+    "wellnessProfile": true,
+    "reviewGrading": true
+  }
+}

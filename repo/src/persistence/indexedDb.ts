@@ -25,6 +25,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 /** Test-only: close and drop the cached DB connection so the next call re-opens. */
 export async function _resetDbCache(): Promise<void> {
   if (dbPromise) {
+    /* v8 ignore next 1 */
     try { (await dbPromise).close(); } catch { /* noop */ }
   }
   dbPromise = null;

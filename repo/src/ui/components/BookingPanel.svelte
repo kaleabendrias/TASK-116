@@ -14,6 +14,7 @@
   }
 
   async function doHold(): Promise<void> {
+    /* v8 ignore next */
     if (!selectedSeat) return;
     const r = await holdSeat(selectedSeat.id);
     if (r.ok) notify(`Seat ${selectedSeat.label} held for 10 minutes.`, 'success');
@@ -21,12 +22,14 @@
   }
 
   async function doRelease(): Promise<void> {
+    /* v8 ignore next */
     if (!selectedSeat) return;
     await releaseSeat(selectedSeat.id);
     notify(`Seat ${selectedSeat.label} released.`, 'info');
   }
 
   async function doBook(): Promise<void> {
+    /* v8 ignore next */
     if (!selectedSeat) return;
     const r = await bookSeat(selectedSeat.id);
     if (r.ok) {

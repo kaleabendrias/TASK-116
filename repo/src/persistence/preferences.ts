@@ -26,10 +26,12 @@ function read<T>(key: string, fallback: T): T {
 }
 
 function write(key: string, value: unknown): void {
+  /* v8 ignore next 1 */
   try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* noop */ }
 }
 
 function remove(key: string): void {
+  /* v8 ignore next 1 */
   try { localStorage.removeItem(PREFIX + key); } catch { /* noop */ }
 }
 

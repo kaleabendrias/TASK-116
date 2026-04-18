@@ -48,6 +48,11 @@
     await startSeatMap(id);
   }
 
+  function onDepartureInput(e: Event): void {
+    const val = (e.currentTarget as HTMLInputElement).value;
+    form.departureAt = fromIsoLocal(val);
+  }
+
   function toIsoLocal(ms: number): string {
     const d = new Date(ms);
     const off = d.getTimezoneOffset();
@@ -118,7 +123,7 @@
     <input
       type="datetime-local"
       value={toIsoLocal(form.departureAt)}
-      on:input={(e) => form.departureAt = fromIsoLocal((e.currentTarget as HTMLInputElement).value)}
+      on:input={onDepartureInput}
       style="width:100%"
     />
   </label><br/><br/>

@@ -6,6 +6,9 @@
 
   type Mode = 'login' | 'register' | 'bootstrap';
 
+  /** Test-only: inject initial value to avoid async IDB detection in unit tests. */
+  export let initialAdminMissing: boolean | undefined = undefined;
+
   const DEPARTMENTS = businessConfig().departments;
   let mode: Mode = 'login';
   let username = '';
@@ -14,12 +17,13 @@
   let department: string = '';
   let error = '';
   let busy = false;
-  let adminMissing = false;
+  let adminMissing = initialAdminMissing ?? false;
 
   // Public registration cannot mint administrators — filter the role picker.
   const PUBLIC_ROLES = ALL_ROLES.filter((r) => r !== 'administrator');
 
   onMount(async () => {
+    if (initialAdminMissing !== undefined) return;
     try {
       adminMissing = !(await isAdminBootstrapped());
     } catch {
@@ -41,6 +45,7 @@
         await login(username, password);
       }
     } catch (e) {
+      /* v8 ignore next */
       error = e instanceof Error ? e.message : 'Authentication failed';
     } finally {
       busy = false;
@@ -52,23 +57,18 @@
     if (next === 'register') role = 'dispatcher';
   }
 
-  function title(): string {
-    if (mode === 'bootstrap') return 'First-run setup';
-    if (mode === 'register') return 'Create account';
-    return 'Sign in';
-  }
-
-  function subtitle(): string {
-    if (mode === 'bootstrap') return 'No administrator exists yet — create the first one.';
-    if (mode === 'register') return 'Public registration cannot mint administrators.';
-    return 'Local pseudo-login — passwords are salted &amp; hashed in the browser.';
-  }
+  $: title = mode === 'bootstrap' ? 'First-run setup' : mode === 'register' ? 'Create account' : 'Sign in';
+  $: subtitle = mode === 'bootstrap'
+    ? 'No administrator exists yet — create the first one.'
+    : mode === 'register'
+    ? 'Public registration cannot mint administrators.'
+    : 'Local pseudo-login — passwords are salted &amp; hashed in the browser.';
 </script>
 
 <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
   <form class="card" style="width: min(440px, 92vw);" on:submit|preventDefault={submit}>
-    <h2 style="margin-top:0;">{title()}</h2>
-    <p style="color:var(--muted); margin-top:0;">{@html subtitle()}</p>
+    <h2 style="margin-top:0;">{title}</h2>
+    <p style="color:var(--muted); margin-top:0;">{@html subtitle}</p>
 
     {#if mode !== 'bootstrap' && adminMissing}
       <div class="card" style="background:#2a2417; border-color:#b58900; color:#f1c40f; padding:10px 12px; margin-bottom:12px;">

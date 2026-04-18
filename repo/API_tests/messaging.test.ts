@@ -57,6 +57,12 @@ describe('messagingService', () => {
     expect(all.length).toBe(0);
   }, 30000);
 
+  it('rejects send when toUserId is whitespace-only (covers .trim() branch)', async () => {
+    await loginAs('ws-sender');
+    await expect(sendMessage({ toUserId: '   ', category: 'system' }))
+      .rejects.toThrow(/Recipient is required/);
+  }, 30000);
+
   it('renders templates and delivers immediately', async () => {
     await loginAs('alice');
     const recipient = await registerRecipient('bob');

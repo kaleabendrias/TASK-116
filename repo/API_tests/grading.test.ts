@@ -358,4 +358,95 @@ describe('gradingService', () => {
     expect(found).not.toBeNull();
     expect(found?.attemptId).toBe(attemptId);
   }, 90000);
+
+  it('decryptNotes throws NotesDecryptionError when called with no session key (logged out)', async () => {
+    // payload exists but no encryption key because no session
+    const fakePayload = { iv: 'AAAA', data: 'BBBB', salt: 'CCCC' } as unknown as import('@shared/crypto/fieldCrypto').EncryptedField;
+    logout();
+    await expect(decryptNotes(fakePayload)).rejects.toBeInstanceOf(NotesDecryptionError);
+  });
+
+  it('submitSecondReview rejects a corrupt PENDING_SECOND_REVIEW record with non-null finalScore', async () => {
+    await asReviewer('corrupt-rev-1');
+    const corruptGrade: Grade = {
+      id: uid('grade'),
+      attemptId: 'fake-attempt-corrupt-1',
+      questionId: 'fake-q',
+      graderId: 'reviewer-x',
+      firstScore: 50,
+      secondScore: null,
+      secondGraderId: null,
+      finalScore: 50, // corrupt: PENDING must have null finalScore
+      state: 'PENDING_SECOND_REVIEW',
+      awaitingSecondReview: true,
+      blockedReason: null,
+      notesEncrypted: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await gradesRepository.put(corruptGrade);
+    await expect(submitSecondReview(corruptGrade.id, { score: 50, notes: '' }))
+      .rejects.toThrow(/corrupt/);
+  }, 30000);
+
+  it('submitSecondReview rejects a corrupt PENDING_SECOND_REVIEW record with non-null secondGraderId', async () => {
+    await asReviewer('corrupt-rev-2');
+    const corruptGrade: Grade = {
+      id: uid('grade'),
+      attemptId: 'fake-attempt-corrupt-2',
+      questionId: 'fake-q',
+      graderId: 'reviewer-y',
+      firstScore: 50,
+      secondScore: null,
+      secondGraderId: 'already-graded', // corrupt: PENDING must have null secondGraderId
+      finalScore: null,
+      state: 'PENDING_SECOND_REVIEW',
+      awaitingSecondReview: true,
+      blockedReason: null,
+      notesEncrypted: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    await gradesRepository.put(corruptGrade);
+    await expect(submitSecondReview(corruptGrade.id, { score: 50, notes: '' }))
+      .rejects.toThrow(/corrupt/);
+  }, 30000);
+
+  it('two separate reviewers grading two separate attempts both produce PENDING_SECOND_REVIEW grades', async () => {
+    await asContentAuthor('parallel-author');
+    const attemptA = await setupAttempt();
+    const attemptB = await setupAttempt();
+    logout();
+
+    // Reviewer A grades attempt A
+    await asReviewer('parallel-rev-a');
+    const gradeA = await submitFirstReview({ attemptId: attemptA, score: 60, notes: '' });
+    expect(gradeA.state).toBe('PENDING_SECOND_REVIEW');
+    expect(gradeA.attemptId).toBe(attemptA);
+    logout();
+
+    // Reviewer B grades attempt B — completely independent
+    await asReviewer('parallel-rev-b');
+    const gradeB = await submitFirstReview({ attemptId: attemptB, score: 70, notes: '' });
+    expect(gradeB.state).toBe('PENDING_SECOND_REVIEW');
+    expect(gradeB.attemptId).toBe(attemptB);
+
+    // Both grades are distinct and reference their own attempt
+    expect(gradeA.id).not.toBe(gradeB.id);
+    expect(gradeA.attemptId).not.toBe(gradeB.attemptId);
+  }, 120000);
+
+  it('a second reviewer may not submit a second review for an attempt they already first-reviewed', async () => {
+    await asContentAuthor('conflict-author');
+    const attemptId = await setupAttempt();
+    logout();
+
+    await asReviewer('conflict-rev-1');
+    const first = await submitFirstReview({ attemptId, score: 55, notes: '' });
+    expect(first.state).toBe('PENDING_SECOND_REVIEW');
+
+    // Same reviewer tries to submit second review — must be rejected
+    await expect(submitSecondReview(first.id, { score: 60, notes: '' }))
+      .rejects.toThrow();
+  }, 90000);
 });

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
 import {
-  startSeatMap, stopSeatMap, seatMap, availableCount, holdSeat, releaseSeat, bookSeat, ownHoldFor
+  startSeatMap, stopSeatMap, seatMap, availableCount, holdSeat, releaseSeat, bookSeat, ownHoldFor,
+  getActiveTripId
 } from '@application/services/seatMapService';
 import { seatMapRepository, _setTabIdForTesting } from '@persistence/seatMapRepository';
 import { register, login, logout, bootstrapFirstAdmin } from '@application/services/authService';
@@ -170,6 +171,31 @@ describe('seatMapService — multi-tab race', () => {
     const off = seatMapRepository.subscribe(() => {});
     off();
   });
+
+  it('holdSeat returns rejected when seat is already held by another tab (covers hold.rejected log)', async () => {
+    const tripId = await newTripAndStart('hold-rej');
+    // Hold from the default tab
+    _setTabIdForTesting('tab-hold-A');
+    const r1 = await seatMapRepository.tryHold(tripId, '3B', 60_000);
+    expect(r1.ok).toBe(true);
+
+    // Try holdSeat (service layer) from a different tab → rejected
+    _setTabIdForTesting('tab-hold-B');
+    const r2 = await holdSeat('3B');
+    expect(r2.ok).toBe(false);
+    stopSeatMap();
+  }, 30000);
+
+  it('getActiveTripId returns the active trip id when a trip is selected', async () => {
+    const tripId = await newTripAndStart('active-trip');
+    expect(getActiveTripId()).toBe(tripId);
+    stopSeatMap();
+  }, 30000);
+
+  it('startSeatMap throws "Trip not found" for a non-existent trip id', async () => {
+    await loginAsDispatcher('missing-trip-disp');
+    await expect(startSeatMap('trip-does-not-exist')).rejects.toThrow(/Trip not found/);
+  }, 30000);
 
   it('seat inventories are scoped per trip', async () => {
     const tripA = await newTripAndStart('iso-a');

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Single-command containerized test runner.
-# - Boots the test container
-# - Runs the unit suite, then the API/integration suite
+# - Boots the test container (dependencies pre-installed in the Docker image via npm ci)
+# - Runs unit, API, HTTP, and frontend suites
 # - Each suite enforces >=90% coverage on its own scope
-# - Prints both coverage summaries
+# - Prints all coverage summaries
 # - Exits non-zero on any failure or threshold miss
 set -u
 
@@ -13,7 +13,7 @@ cd "$REPO_DIR"
 COMPOSE="docker compose -f docker-compose.test.yml"
 
 cleanup() {
-  $COMPOSE down --remove-orphans >/dev/null 2>&1 || true
+  $COMPOSE down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -21,15 +21,13 @@ echo "============================================================"
 echo "  task-09 — containerized test runner"
 echo "============================================================"
 
-$COMPOSE run --rm \
+# Remove stale node_modules volume so the rebuilt image's packages are always used.
+$COMPOSE down --volumes --remove-orphans >/dev/null 2>&1 || true
+
+$COMPOSE run --rm --build \
   --entrypoint sh \
   tests -lc '
     set -u
-    if [ -f package-lock.json ]; then
-      npm ci --no-audit --no-fund >/dev/null 2>&1 || npm install --no-audit --no-fund >/dev/null 2>&1
-    else
-      npm install --no-audit --no-fund >/dev/null 2>&1
-    fi
     echo
     echo "::::: UNIT SUITE :::::"
     npm run --silent test:unit
@@ -38,9 +36,21 @@ $COMPOSE run --rm \
     echo "::::: API SUITE :::::"
     npm run --silent test:api
     API_RC=$?
-    if [ "$UNIT_RC" -ne 0 ] || [ "$API_RC" -ne 0 ]; then
+    echo
+    echo "::::: HTTP SUITE :::::"
+    npm run --silent test:http
+    HTTP_RC=$?
+    echo
+    echo "::::: FRONTEND SUITE :::::"
+    npm run --silent test:frontend
+    FRONT_RC=$?
+    echo
+    echo "::::: E2E SUITE :::::"
+    npm run --silent test:e2e
+    E2E_RC=$?
+    if [ "$UNIT_RC" -ne 0 ] || [ "$API_RC" -ne 0 ] || [ "$HTTP_RC" -ne 0 ] || [ "$FRONT_RC" -ne 0 ] || [ "$E2E_RC" -ne 0 ]; then
       echo
-      echo "Suite failed: unit=$UNIT_RC api=$API_RC"
+      echo "Suite failed: unit=$UNIT_RC api=$API_RC http=$HTTP_RC frontend=$FRONT_RC e2e=$E2E_RC"
       exit 1
     fi
     exit 0
@@ -69,12 +79,15 @@ print_summary() {
   fi
 }
 
-print_summary "unit" "coverage/unit/coverage-summary.json"
-print_summary "api"  "coverage/api/coverage-summary.json"
+print_summary "unit"     "coverage/unit/coverage-summary.json"
+print_summary "api"      "coverage/api/coverage-summary.json"
+print_summary "http"     "coverage/http/coverage-summary.json"
+print_summary "frontend" "coverage/frontend/coverage-summary.json"
 
-if [ ! -f coverage/unit/coverage-summary.json ] || [ ! -f coverage/api/coverage-summary.json ]; then
+if [ ! -f coverage/unit/coverage-summary.json ] || [ ! -f coverage/api/coverage-summary.json ] || \
+   [ ! -f coverage/http/coverage-summary.json ] || [ ! -f coverage/frontend/coverage-summary.json ]; then
   echo
-  echo "RESULT: FAIL — coverage summary files missing; tests did not produce coverage output."
+  echo "RESULT: FAIL — one or more coverage summary files missing."
   exit 1
 fi
 
@@ -83,5 +96,5 @@ if [ "$RC" -ne 0 ]; then
   echo "RESULT: FAIL (exit $RC) — see failures and/or coverage thresholds above."
   exit "$RC"
 fi
-echo "RESULT: PASS — both suites met the >=90% coverage threshold."
+echo "RESULT: PASS — all suites met the >=90% coverage threshold."
 exit 0

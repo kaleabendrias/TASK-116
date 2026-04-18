@@ -30,7 +30,7 @@
     <div class="topbar">
       <span>mode: {cfg.appMode} · locale: {cfg.localeDefault} · test: {cfg.testMode}</span>
       <span style="margin-left:auto; display:flex; gap:12px; align-items:center;">
-        <span>{$principal?.username} · {ROLE_LABELS[$principal!.role]}</span>
+        <span>{$principal?.username} · {$principal ? ROLE_LABELS[$principal.role] : ''}</span>
         <button class="btn secondary" on:click={logout}>Sign out</button>
       </span>
     </div>

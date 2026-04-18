@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
-import { register, login, logout } from '@application/services/authService';
+import { register, login, logout, currentUserId } from '@application/services/authService';
 import {
   loadHealthProfile, saveHealthProfile, recommendForCurrentUser,
   swapEquivalent, applySwap, healthProfile, nutritionBudgetFor
@@ -106,4 +106,93 @@ describe('healthService crypto-at-rest + nutrition budget', () => {
     await saveHealthProfile({ goals: [], allergens: [], dislikes: [], ageRange: '30-44', activityLevel: 'moderate' });
     await expect(applySwap('f-quinoa')).rejects.toThrow(/No equivalent/);
   }, 60000);
+
+  it('applySwap is idempotent when food is already in dislikes (covers dislikes.includes true branch)', async () => {
+    await register('idem-user', 'longenough', 'reviewer');
+    await login('idem-user', 'longenough');
+    // Save profile with f-bagel already in dislikes
+    await saveHealthProfile({
+      goals: [], allergens: [], dislikes: ['f-bagel'],
+      ageRange: '30-44', activityLevel: 'moderate'
+    });
+    await loadHealthProfile();
+    const result = await applySwap('f-bagel');
+    // Should return the swap target
+    expect(result.swap.id).toBe('f-oat');
+    // Dislikes should still contain f-bagel exactly once (idempotent)
+    expect(result.preferences.dislikes.filter((d: string) => d === 'f-bagel').length).toBe(1);
+  }, 60000);
+
+  it('loadHealthProfile treats stored record with non-encrypted preferences as empty (covers !isEncrypted branch)', async () => {
+    await register('raw-prefs-user', 'longenough', 'reviewer');
+    await login('raw-prefs-user', 'longenough');
+    const userId = currentUserId()!;
+    // Put a record with encryptedPreferences that is NOT a valid EncryptedField
+    await healthRepository.put({
+      id: userId,
+      userId,
+      encryptedPreferences: { notAnEncryptedField: true } as unknown as import('@shared/crypto/fieldCrypto').EncryptedField,
+      updatedAt: Date.now()
+    });
+    await loadHealthProfile();
+    const view = get(healthProfile);
+    // Non-encrypted record → treated as missing → empty prefs
+    expect(view.loaded).toBe(true);
+    expect(view.preferences.goals).toEqual([]);
+  }, 30000);
+
+  it('saveHealthProfile update: second save overwrites first and persists the latest values', async () => {
+    await register('update-user', 'longenough', 'reviewer');
+    await login('update-user', 'longenough');
+
+    await saveHealthProfile({
+      goals: ['high-protein'], allergens: [], dislikes: [],
+      ageRange: '18-29', activityLevel: 'sedentary'
+    });
+    await saveHealthProfile({
+      goals: ['weight-loss', 'whole-grain'], allergens: ['nuts'], dislikes: ['f-bagel'],
+      ageRange: '45-59', activityLevel: 'active'
+    });
+
+    // Reload from IDB and verify the latest values are stored
+    await loadHealthProfile();
+    const view = get(healthProfile);
+    expect(view.loaded).toBe(true);
+    expect(view.preferences.goals).toContain('weight-loss');
+    expect(view.preferences.goals).toContain('whole-grain');
+    expect(view.preferences.allergens).toContain('nuts');
+    expect(view.preferences.dislikes).toContain('f-bagel');
+    expect(view.preferences.ageRange).toBe('45-59');
+    expect(view.preferences.activityLevel).toBe('active');
+    // First save's values must NOT appear
+    expect(view.preferences.goals).not.toContain('high-protein');
+    expect(view.preferences.ageRange).not.toBe('18-29');
+  }, 60000);
+
+  it('full round-trip: all preference fields survive a logout + login cycle via AES-GCM', async () => {
+    await register('roundtrip-user', 'longenough', 'reviewer');
+    await login('roundtrip-user', 'longenough');
+
+    const prefs = {
+      goals: ['low-sodium', 'whole-grain'],
+      allergens: ['gluten', 'dairy'],
+      dislikes: ['f-bagel', 'f-oat'],
+      ageRange: '30-44' as const,
+      activityLevel: 'moderate' as const
+    };
+    await saveHealthProfile(prefs);
+
+    // Full logout + re-login cycle to re-derive the AES-GCM key
+    logout();
+    await login('roundtrip-user', 'longenough');
+    await loadHealthProfile();
+
+    const view = get(healthProfile);
+    expect(view.loaded).toBe(true);
+    expect(view.preferences.goals).toEqual(prefs.goals);
+    expect(view.preferences.allergens).toEqual(prefs.allergens);
+    expect(view.preferences.dislikes).toEqual(prefs.dislikes);
+    expect(view.preferences.ageRange).toBe(prefs.ageRange);
+    expect(view.preferences.activityLevel).toBe(prefs.activityLevel);
+  }, 90000);
 });

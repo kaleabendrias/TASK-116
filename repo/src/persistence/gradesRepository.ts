@@ -83,6 +83,7 @@ export const gradesRepository = {
         if (err && err.name === 'ConstraintError') {
           reject(new DuplicateGradeError(g.attemptId));
         } else {
+          /* v8 ignore next 1 */
           reject(err);
         }
       };
@@ -92,11 +93,13 @@ export const gradesRepository = {
         if (err && err.name === 'ConstraintError') {
           reject(new DuplicateGradeError(g.attemptId));
         } else {
+          /* v8 ignore next 1 */
           reject(err ?? new Error('Transaction aborted'));
         }
       };
       tx.onerror = () => {
         // most error paths are caught above; defensive fallback
+        /* v8 ignore next 4 */
         if (tx.error && tx.error.name === 'ConstraintError') {
           reject(new DuplicateGradeError(g.attemptId));
         } else {

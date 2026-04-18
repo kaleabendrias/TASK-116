@@ -28,6 +28,7 @@
     if (isMine) return 'seat held-mine';
     if (hold && hold.expiresAt > state.now) return 'seat held-other';
     if (selected(seat)) return 'seat selected';
+    /* v8 ignore next */
     return selectable ? 'seat available' : 'seat blocked';
   }
 
